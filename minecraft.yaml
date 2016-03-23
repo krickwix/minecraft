@@ -1,4 +1,4 @@
-heat_template_version: 2015-10-15
+heat_template_version: 2015-04-30
 
 description: |
  #### Production
@@ -68,15 +68,9 @@ parameters:
     description: Online mode requires clients to have a valid Minecraft account.
   server_flavor:
     type: string
-    default: 4 GB General Purpose v1
+    default: m1.small
     label: Server Flavor
     description: Flavor of Cloud Server to use for Minecraft
-    constraints:
-    - allowed_values:
-      - 1 GB General Purpose v1
-      - 2 GB General Purpose v1
-      - 4 GB General Purpose v1
-      - 8 GB General Purpose v1
 #  server_image:
 #    type: string
 #    default: f4bbbce2-50b0-4b07-bf09-96c175a45f4b
@@ -154,16 +148,40 @@ resources:
         get_resource: minecraft_config
       server:
         get_resource: minecraft_server
+
+  sec_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      description: Bastion SecurityGroup
+      name: minecraft_server
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+
+  port:
+    type: OS::Neutron::Port
+    properties:
+      network: test_net
+      fixed_ips:
+        - subnet_id: b55992f7-2d2a-4c45-8f65-cad3d0f45fd0	
+      security_groups: [{ get_resource: sec_group }]
+
   #Master Server
   minecraft_server:
     type: OS::Nova::Server
     properties:
       name: { get_param: "OS::stack_name" }
       #image: { get_param: server_image }
-      image: f4bbbce2-50b0-4b07-bf09-96c175a45f4b
+      image: ubuntu-software-config
       flavor: { get_param: server_flavor }
       key_name: { get_resource: ssh_key }
       software_config_transport: POLL_TEMP_URL
+      networks: 
+        - port: { get_resource: port }
       config_drive: true
       user_data_format: SOFTWARE_CONFIG
       metadata:
